@@ -12,7 +12,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const shops = [
         {
             name: '買取商店',
-            url: `https://www.kaitorishouten-co.jp/search?keyword=${jan}`,
+            url: `https://www.kaitorishouten-co.jp/search/${jan}`,
             selector: '.price_num',
             fallback: true
         },
