@@ -1,13 +1,3 @@
-export interface InventoryItem {
-    id: string;
-    janCode: string;
-    name: string; // Initially just "Unknown Item" or fetched name
-    purchasePrice: number;
-    quantity: number;
-    timestamp: number;
-    status: 'active' | 'sold';
-    soldDate?: number;
-    soldPrice?: number;
 }
 
 export interface ShopPrice {

@@ -63,6 +63,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             const $ = cheerio.load(data);
             let price = 0;
+            let productName = '';
+            let imageUrl = '';
+
+            // Scrape metadata if it's Kaitori Wiki (good source for names)
+            if (shop.name === '買取Wiki') {
+                productName = $('meta[property="og:title"]').attr('content') || $('title').text() || '';
+                // Clean up title (remove site name etc if needed)
+                productName = productName.replace(' | 買取Wiki', '').replace('検索結果', '').trim();
+
+                imageUrl = $('meta[property="og:image"]').attr('content') || '';
+            }
 
             const text = $('body').text();
             // Regex to find prices: ¥ followed by numbers or numbers followed by 円
@@ -85,7 +96,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return {
                 shopName: shop.name,
                 price,
-                url: shop.url
+                url: shop.url,
+                productName, // Return these
+                imageUrl
             };
 
         } catch (error) {

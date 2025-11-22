@@ -11,13 +11,28 @@ export const InventoryService = {
 
     add: (item: Omit<InventoryItem, 'id' | 'timestamp' | 'status'>) => {
         const items = InventoryService.getAll();
-        const newItem: InventoryItem = {
-            ...item,
-            id: crypto.randomUUID(),
-            timestamp: Date.now(),
-            status: 'active'
-        };
-        items.push(newItem);
+        const existingItemIndex = items.findIndex(i => i.janCode === item.janCode && i.status === 'active');
+
+        if (existingItemIndex !== -1) {
+            // Update existing item
+            const existingItem = items[existingItemIndex];
+            items[existingItemIndex] = {
+                ...existingItem,
+                quantity: existingItem.quantity + item.quantity,
+                // Update name/image if new one has it and old one doesn't (or just update to latest)
+                name: item.name || existingItem.name,
+                imageUrl: item.imageUrl || existingItem.imageUrl
+            };
+        } else {
+            // Add new item
+            const newItem: InventoryItem = {
+                ...item,
+                id: crypto.randomUUID(),
+                timestamp: Date.now(),
+                status: 'active'
+            };
+            items.push(newItem);
+        }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
     },
 

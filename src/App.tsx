@@ -16,21 +16,32 @@ function App() {
   const [prices, setPrices] = useState<ShopPrice[]>([]);
   const [loadingPrices, setLoadingPrices] = useState(false);
   const [purchasePrice, setPurchasePrice] = useState<string>('');
+  const [purchasePrice, setPurchasePrice] = useState('');
+  const [addQuantity, setAddQuantity] = useState('1');
+  const [fetchedMeta, setFetchedMeta] = useState<{ name?: string, imageUrl?: string }>({});
 
   useEffect(() => {
     setInventory(InventoryService.getAll());
   }, []);
 
   const handleScan = async (code: string) => {
-    if (scannedCode === code) return; // Prevent duplicate processing
     setScannedCode(code);
     setLoadingPrices(true);
-
+    setFetchedMeta({}); // Reset meta
     try {
-      const fetchedPrices = await PriceService.fetchPrices(code);
-      setPrices(fetchedPrices);
-    } catch (e) {
-      console.error(e);
+      const results = await PriceService.fetchPrices(code);
+      setPrices(results);
+
+      // Try to find name/image from results (e.g. from Kaitori Wiki)
+      const wikiResult = results.find(r => r.shopName === '買取Wiki' && (r as any).productName);
+      if (wikiResult) {
+        setFetchedMeta({
+          name: (wikiResult as any).productName,
+          imageUrl: (wikiResult as any).imageUrl
+        });
+      }
+    } catch (error) {
+      console.error(error);
     } finally {
       setLoadingPrices(false);
     }
@@ -39,11 +50,14 @@ function App() {
   const handleAddToInventory = () => {
     if (!scannedCode) return;
     const price = parseInt(purchasePrice) || 0;
+    const qty = parseInt(addQuantity) || 1;
+
     InventoryService.add({
       janCode: scannedCode,
-      name: `Item ${scannedCode}`,
+      name: fetchedMeta.name || `Item ${scannedCode}`,
+      imageUrl: fetchedMeta.imageUrl,
       purchasePrice: price,
-      quantity: 1
+      quantity: qty
     });
     setInventory(InventoryService.getAll());
 
@@ -51,7 +65,8 @@ function App() {
     setScannedCode(null);
     setPrices([]);
     setPurchasePrice('');
-    alert('Added to inventory!');
+    setAddQuantity('1');
+    alert(`Added ${qty} items to inventory!`);
   };
 
 
@@ -154,18 +169,51 @@ function App() {
                     </div>
 
                     <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
-                      <label style={{ display: 'block', marginBottom: '8px' }}>Purchase Cost</label>
-                      <input
-                        type="number"
-                        value={purchasePrice}
-                        onChange={(e) => setPurchasePrice(e.target.value)}
-                        placeholder="Enter cost..."
-                      />
+                      <div className="add-stock-form" style={{ marginTop: '20px', padding: '15px', background: '#222', borderRadius: '8px' }}>
+                        <h3 style={{ marginTop: 0 }}>Add to Stock</h3>
+
+                        {fetchedMeta.name && (
+                          <div style={{ marginBottom: '10px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+                            {fetchedMeta.imageUrl && <img src={fetchedMeta.imageUrl} alt="Product" style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '4px' }} />}
+                            <p style={{ margin: 0, fontSize: '0.9rem' }}>{fetchedMeta.name}</p>
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                          <div style={{ flex: 1 }}>
+                            <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '5px' }}>Cost (Optional)</label>
+                            <input
+                              type="number"
+                              placeholder="0"
+                              value={purchasePrice}
+                              onChange={(e) => setPurchasePrice(e.target.value)}
+                              style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #444', background: '#333', color: '#fff' }}
+                            />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '5px' }}>Quantity</label>
+                            <input
+                              type="number"
+                              placeholder="1"
+                              value={addQuantity}
+                              onChange={(e) => setAddQuantity(e.target.value)}
+                              style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #444', background: '#333', color: '#fff' }}
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={handleAddToInventory}
+                          className="btn btn-primary"
+                          style={{ width: '100%' }}
+                        >
+                          Add to Inventory
+                        </button>
+                      </div>
                     </div>
 
                     <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
                       <button className="btn" style={{ background: '#333' }} onClick={() => setScannedCode(null)}>Cancel</button>
-                      <button className="btn btn-primary" onClick={handleAddToInventory}>Add to Stock</button>
                     </div>
                   </div>
                 )}
