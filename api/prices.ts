@@ -75,8 +75,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     'Sec-Fetch-User': '?1',
                     'Upgrade-Insecure-Requests': '1'
                 },
-                timeout: 10000 // Increase timeout
+                timeout: 10000
             });
+
+            const $ = cheerio.load(data);
+            let price = 0;
+            let productName = '';
+            let imageUrl = '';
+
+            // Rakuten Metadata Fetching (Primary Source)
+            if (shop.name === 'Rakuten') {
+                const firstItem = $('.searchresultitem').first();
+                if (firstItem.length) {
+                    productName = firstItem.find('.title a').text().trim();
+                    imageUrl = firstItem.find('.image img').attr('src') || '';
+                } else {
+                    // Fallback for Rakuten generic structure
+                    productName = $('div[class*="title"] a').first().text().trim();
+                    imageUrl = $('div[class*="image"] img').first().attr('src') || '';
+                }
+            }
+
+            const text = $('body').text();
+            // Regex to find prices: ¥ followed by numbers or numbers followed by 円
+            const priceRegex = /[¥￥]([0-9,]+)|([0-9,]+)円/g;
+            let match;
             const foundPrices: number[] = [];
 
             while ((match = priceRegex.exec(text)) !== null) {
@@ -114,8 +137,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let bestImage = '';
 
     results.forEach(r => {
-        if (r.productName && r.productName.length > bestName.length) bestName = r.productName;
-        if (r.imageUrl && !bestImage) bestImage = r.imageUrl;
+        // Only use Rakuten for metadata
+        if (r.shopName === 'Rakuten') {
+            if (r.productName) bestName = r.productName;
+            if (r.imageUrl) bestImage = r.imageUrl;
+        }
     });
 
     // Backfill metadata to all results if needed (optional, but good for UI)
