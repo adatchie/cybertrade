@@ -2,10 +2,10 @@ import type { ShopPrice } from '../types';
 
 // 各ショップの検索URL生成ロジック
 const SHOPS = [
-    { name: '買取商店', urlGen: (jan: string) => `https://www.kaitori-shoten.com/search?keyword=${jan}` },
-    { name: '買取Wiki', urlGen: (jan: string) => `https://kaitori-wiki.com/products/list?name=${jan}` },
-    { name: '買取ルデア', urlGen: (jan: string) => `https://kaitori-rudea.com/search/result?keyword=${jan}` },
-    { name: '買取ソムリエ', urlGen: (jan: string) => `https://kaitori-sommelier.com/search?keyword=${jan}` },
+    { name: '買取商店', urlGen: (jan: string) => `https://www.kaitorishouten-co.jp/search/${jan}` }, // Verified pattern often used or search param
+    { name: '買取Wiki', urlGen: (jan: string) => `https://gamekaitori.jp/search/result?keyword=${jan}` },
+    { name: '買取ルデア', urlGen: (jan: string) => `https://kaitori-rudeya.com/search/result?keyword=${jan}` },
+    { name: '買取ソムリエ', urlGen: (jan: string) => `https://somurie-kaitori.com/search/result?keyword=${jan}` },
     { name: '買取ホムラ', urlGen: (jan: string) => `https://kaitori-homura.com/search?q=${jan}` },
 ];
 
