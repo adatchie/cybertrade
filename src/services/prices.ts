@@ -14,16 +14,6 @@ const SHOPS = [
 export const PriceService = {
     fetchPrices: async (janCode: string): Promise<ShopPrice[]> => {
         try {
-            // Call our own Vercel API
-            // Note: In local dev, this might fail if the API isn't running on the same port or proxy isn't set up.
-            // For Vercel deployment, /api/prices works.
-            // For local dev, we might need to point to the full URL or mock it if API isn't running locally.
-
-            // Check if we are in dev mode and if API is available. 
-            // Since we are running 'vite', the API function won't run locally unless we use 'vercel dev'.
-            // So for local testing, we might still fallback to links, but for production, we use API.
-
-            // For now, let's try to fetch. If it fails, fallback to links.
             const response = await fetch(`/api/prices?jan=${janCode}`);
             if (!response.ok) throw new Error('API failed');
 
@@ -33,15 +23,42 @@ export const PriceService = {
         } catch (e) {
             console.warn('API fetch failed, falling back to links generation', e);
 
-            // Fallback logic (same as before)
+            // Try Google Books API for metadata (Client-side fallback)
+            let googleMeta = { productName: '', imageUrl: '' };
+            try {
+                const gRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${janCode}`);
+                const gData = await gRes.json();
+                if (gData.items && gData.items.length > 0) {
+                    const vol = gData.items[0].volumeInfo;
+                    googleMeta.productName = vol.title;
+                    if (vol.imageLinks) {
+                        googleMeta.imageUrl = vol.imageLinks.thumbnail || vol.imageLinks.smallThumbnail;
+                    }
+                }
+            } catch (gErr) {
+                console.warn('Google Books API failed', gErr);
+            }
+
+            // Fallback logic
             const results: ShopPrice[] = [];
             SHOPS.forEach(shop => {
+                // Add Rakuten link manually if not in SHOPS (it is not in SHOPS array in this file yet)
                 results.push({
                     shopName: shop.name,
                     price: 0,
-                    url: shop.urlGen(janCode)
-                });
+                    url: shop.urlGen(janCode),
+                    ...((shop.name === '買取Wiki' || shop.name === 'Rakuten') ? googleMeta : {}) // Attach google meta to one of them to be picked up
+                } as any);
             });
+
+            // Add Rakuten explicitly if missing from SHOPS constant
+            results.push({
+                shopName: 'Rakuten',
+                price: 0,
+                url: `https://search.rakuten.co.jp/search/mall/${janCode}/`,
+                ...googleMeta
+            } as any);
+
             return results;
         }
     },
