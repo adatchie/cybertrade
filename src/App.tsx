@@ -39,7 +39,12 @@ function App() {
   const handleAddToInventory = () => {
     if (!scannedCode) return;
     const price = parseInt(purchasePrice) || 0;
-    InventoryService.add(scannedCode, price, 1);
+    InventoryService.add({
+      janCode: scannedCode,
+      name: `Item ${scannedCode}`,
+      purchasePrice: price,
+      quantity: 1
+    });
     setInventory(InventoryService.getAll());
 
     // Reset

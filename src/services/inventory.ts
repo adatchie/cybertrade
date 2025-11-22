@@ -3,11 +3,6 @@ import { v4 as uuidv4 } from 'uuid';
 
 const STORAGE_KEY = 'resale_inventory';
 
-import type { InventoryItem } from '../types';
-import { v4 as uuidv4 } from 'uuid';
-
-const STORAGE_KEY = 'resale_inventory';
-
 export const InventoryService = {
     getAll: (): InventoryItem[] => {
         const data = localStorage.getItem(STORAGE_KEY);
