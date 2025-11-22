@@ -105,221 +105,244 @@ export const InventoryList = ({ items, onUpdate }: InventoryListProps) => {
         let updatedCount = 0;
         let errorCount = 0;
 
-    });
-}
-                } catch (e) {
-    console.error(`Failed to refresh ${jan}`, e);
-    errorCount++;
-}
-            }
-onUpdate();
-alert(`Metadata updated!\nUpdated: ${updatedCount} items\nErrors: ${errorCount}`);
-        } catch (error) {
-    console.error(error);
-    alert('Error updating metadata');
-} finally {
-    setIsRefreshing(false);
-}
-    };
+        try {
+            const uniqueJans = Array.from(new Set(items.map(i => i.janCode)));
 
-const handleExport = () => {
-    const dataStr = JSON.stringify(items, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `inventory_backup_${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-};
+            for (const jan of uniqueJans) {
+                try {
+                    const results = await PriceService.fetchPrices(jan);
+                    // Prioritize Rakuten for metadata
+                    const metaResult = results.find(r => r.shopName === 'Rakuten' && (r as any).productName);
 
-const handleImport = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'application/json';
-    input.onchange = (e) => {
-        const file = (e.target as HTMLInputElement).files?.[0];
-        if (!file) return;
+                    if (metaResult) {
+                        const name = (metaResult as any).productName;
+                        const imageUrl = (metaResult as any).imageUrl;
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            try {
-                const json = JSON.parse(event.target?.result as string);
-                if (Array.isArray(json)) {
-                    if (confirm(`Import ${json.length} items? This will merge with current inventory.`)) {
-                        const currentIds = new Set(items.map(i => i.id));
-                        let added = 0;
-                        json.forEach((item: InventoryItem) => {
-                            if (!currentIds.has(item.id)) {
-                                InventoryService.importItem(item);
-                                added++;
+                        const itemsToUpdate = items.filter(i => i.janCode === jan);
+                        itemsToUpdate.forEach(item => {
+                            // Update if missing image or if name is generic or from Wiki
+                            if (!item.imageUrl || item.name.startsWith('Item ') || item.name.includes('買取Wiki')) {
+                                InventoryService.update(item.id, {
+                                    name: name,
+                                    imageUrl: imageUrl
+                                });
+                                updatedCount++;
                             }
                         });
-                        onUpdate();
-                        alert(`Imported ${added} new items.`);
                     }
-                } else {
-                    alert('Invalid JSON format');
+                } catch (e) {
+                    console.error(`Failed to refresh ${jan}`, e);
+                    errorCount++;
                 }
-            } catch (err) {
-                alert('Failed to parse JSON');
             }
-        };
-        reader.readAsText(file);
+            onUpdate();
+            alert(`Metadata updated!\nUpdated: ${updatedCount} items\nErrors: ${errorCount}`);
+        } catch (error) {
+            console.error(error);
+            alert('Error updating metadata');
+        } finally {
+            setIsRefreshing(false);
+        }
     };
-    input.click();
-};
 
-const filteredItems = items.filter(item => {
-    const status = item.status || 'active'; // Default to active for old data
-    return status === activeTab;
-});
+    const handleExport = () => {
+        const dataStr = JSON.stringify(items, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `inventory_backup_${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
 
-return (
-    <div className="inventory-list">
-        <div className="tabs" style={{ display: 'flex', gap: '10px', marginBottom: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button
-                className={`tab-btn ${activeTab === 'active' ? 'active' : ''}`}
-                onClick={() => setActiveTab('active')}
-                style={{
-                    flex: 1,
-                    minWidth: '100px',
-                    padding: '10px',
-                    background: activeTab === 'active' ? 'var(--primary-color)' : '#333',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '8px'
-                }}
-            >
-                Active Stock
-            </button>
-            <button
-                className={`tab-btn ${activeTab === 'sold' ? 'active' : ''}`}
-                onClick={() => setActiveTab('sold')}
-                style={{
-                    flex: 1,
-                    minWidth: '100px',
-                    padding: '10px',
-                    background: activeTab === 'sold' ? 'var(--primary-color)' : '#333',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '8px'
-                }}
-            >
-                Sold History
-            </button>
-            <div style={{ display: 'flex', gap: '5px' }}>
+    const handleImport = () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'application/json';
+        input.onchange = (e) => {
+            const file = (e.target as HTMLInputElement).files?.[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const json = JSON.parse(event.target?.result as string);
+                    if (Array.isArray(json)) {
+                        if (confirm(`Import ${json.length} items? This will merge with current inventory.`)) {
+                            const currentIds = new Set(items.map(i => i.id));
+                            let added = 0;
+                            json.forEach((item: InventoryItem) => {
+                                if (!currentIds.has(item.id)) {
+                                    InventoryService.importItem(item);
+                                    added++;
+                                }
+                            });
+                            onUpdate();
+                            alert(`Imported ${added} new items.`);
+                        }
+                    } else {
+                        alert('Invalid JSON format');
+                    }
+                } catch (err) {
+                    alert('Failed to parse JSON');
+                }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
+    };
+
+    const filteredItems = items.filter(item => {
+        const status = item.status || 'active'; // Default to active for old data
+        return status === activeTab;
+    });
+
+    return (
+        <div className="inventory-list">
+            <div className="tabs" style={{ display: 'flex', gap: '10px', marginBottom: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <button
-                    onClick={handleRefreshMetadata}
-                    disabled={isRefreshing}
+                    className={`tab-btn ${activeTab === 'active' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('active')}
                     style={{
+                        flex: 1,
+                        minWidth: '100px',
                         padding: '10px',
-                        background: '#444',
+                        background: activeTab === 'active' ? 'var(--primary-color)' : '#333',
                         color: '#fff',
                         border: 'none',
-                        borderRadius: '8px',
-                        cursor: isRefreshing ? 'wait' : 'pointer'
+                        borderRadius: '8px'
                     }}
-                    title="Refresh Metadata"
                 >
-                    <RefreshCw size={20} className={isRefreshing ? 'spin' : ''} />
+                    Active Stock
                 </button>
-                <button onClick={handleExport} style={{ padding: '10px', background: '#444', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }} title="Export JSON">
-                    <Download size={20} />
+                <button
+                    className={`tab-btn ${activeTab === 'sold' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('sold')}
+                    style={{
+                        flex: 1,
+                        minWidth: '100px',
+                        padding: '10px',
+                        background: activeTab === 'sold' ? 'var(--primary-color)' : '#333',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '8px'
+                    }}
+                >
+                    Sold History
                 </button>
-                <button onClick={handleImport} style={{ padding: '10px', background: '#444', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }} title="Import JSON">
-                    <Upload size={20} />
-                </button>
-            </div>
-        </div>
-
-        {filteredItems.length === 0 ? (
-            <p style={{ textAlign: 'center', color: '#888' }}>No items in {activeTab} list.</p>
-        ) : (
-            filteredItems.map((item) => (
-                <div key={item.id} className="inventory-item" style={{
-                    background: '#1a1a1a',
-                    padding: '15px',
-                    borderRadius: '12px',
-                    marginBottom: '10px',
-                    border: '1px solid #333'
-                }}>
-                    <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                        {item.imageUrl ? (
-                            <img src={item.imageUrl} alt={item.name} style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '4px' }} />
-                        ) : (
-                            <div style={{ width: '60px', height: '60px', background: '#333', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555', fontSize: '0.7rem' }}>No Img</div>
-                        )}
-                        <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ fontWeight: 'bold', color: '#fff' }}>{item.name || item.janCode}</span>
-                                <span style={{ fontSize: '0.8rem', color: '#888' }}>
-                                    {new Date(item.timestamp).toLocaleDateString()}
-                                </span>
-                            </div>
-                            <div style={{ fontSize: '0.8rem', color: '#aaa' }}>{item.janCode}</div>
-                        </div>
-                    </div>
-
-                    {editingId === item.id ? (
-                        <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>
-                            <input
-                                type="number"
-                                value={editForm.price}
-                                onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
-                                style={{ width: '80px', padding: '5px' }}
-                                placeholder="Price"
-                            />
-                            <input
-                                type="number"
-                                value={editForm.quantity}
-                                onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
-                                style={{ width: '50px', padding: '5px' }}
-                                placeholder="Qty"
-                            />
-                            <button onClick={() => saveEdit(item.id)} style={{ background: 'green', color: 'white', border: 'none', borderRadius: '4px' }}>Save</button>
-                            <button onClick={() => setEditingId(null)} style={{ background: '#666', color: 'white', border: 'none', borderRadius: '4px' }}>Cancel</button>
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                                <div style={{ color: '#aaa' }}>Buy: ¥{item.purchasePrice.toLocaleString()}</div>
-                                <div style={{ color: '#aaa', fontWeight: 'bold' }}>Qty: {item.quantity}</div>
-                                {item.status === 'sold' && (
-                                    <div style={{ color: '#4caf50', fontWeight: 'bold' }}>
-                                        Sold: ¥{(item.soldPrice || 0).toLocaleString()}
-                                    </div>
-                                )}
-                            </div>
-                            <div style={{ display: 'flex', gap: '10px' }}>
-                                {item.status !== 'sold' && (
-                                    <>
-                                        <Edit2 size={20} color="#4a90e2" onClick={() => startEdit(item)} style={{ cursor: 'pointer' }} />
-                                        <button
-                                            onClick={() => handleSell(item)}
-                                            style={{
-                                                background: 'var(--primary-color)',
-                                                color: 'white',
-                                                border: 'none',
-                                                borderRadius: '4px',
-                                                padding: '5px 10px',
-                                                fontSize: '0.8rem',
-                                                cursor: 'pointer'
-                                            }}
-                                        >
-                                            Sell
-                                        </button>
-                                    </>
-                                )}
-                                <Trash2 size={20} color="#ff4444" onClick={() => handleDelete(item)} style={{ cursor: 'pointer' }} />
-                            </div>
-                        </div>
-                    )}
+                <div style={{ display: 'flex', gap: '5px' }}>
+                    <button
+                        onClick={handleRefreshMetadata}
+                        disabled={isRefreshing}
+                        style={{
+                            padding: '10px',
+                            background: '#444',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: isRefreshing ? 'wait' : 'pointer'
+                        }}
+                        title="Refresh Metadata"
+                    >
+                        <RefreshCw size={20} className={isRefreshing ? 'spin' : ''} />
+                    </button>
+                    <button onClick={handleExport} style={{ padding: '10px', background: '#444', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }} title="Export JSON">
+                        <Download size={20} />
+                    </button>
+                    <button onClick={handleImport} style={{ padding: '10px', background: '#444', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }} title="Import JSON">
+                        <Upload size={20} />
+                    </button>
                 </div>
-            ))
-        )}
-    </div>
-);
+            </div>
+
+            {filteredItems.length === 0 ? (
+                <p style={{ textAlign: 'center', color: '#888' }}>No items in {activeTab} list.</p>
+            ) : (
+                filteredItems.map((item) => (
+                    <div key={item.id} className="inventory-item" style={{
+                        background: '#1a1a1a',
+                        padding: '15px',
+                        borderRadius: '12px',
+                        marginBottom: '10px',
+                        border: '1px solid #333'
+                    }}>
+                        <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                            {item.imageUrl ? (
+                                <img src={item.imageUrl} alt={item.name} style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '4px' }} />
+                            ) : (
+                                <div style={{ width: '60px', height: '60px', background: '#333', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555', fontSize: '0.7rem' }}>No Img</div>
+                            )}
+                            <div style={{ flex: 1 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span style={{ fontWeight: 'bold', color: '#fff' }}>{item.name || item.janCode}</span>
+                                    <span style={{ fontSize: '0.8rem', color: '#888' }}>
+                                        {new Date(item.timestamp).toLocaleDateString()}
+                                    </span>
+                                </div>
+                                <div style={{ fontSize: '0.8rem', color: '#aaa' }}>{item.janCode}</div>
+                            </div>
+                        </div>
+
+                        {editingId === item.id ? (
+                            <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>
+                                <input
+                                    type="number"
+                                    value={editForm.price}
+                                    onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
+                                    style={{ width: '80px', padding: '5px' }}
+                                    placeholder="Price"
+                                />
+                                <input
+                                    type="number"
+                                    value={editForm.quantity}
+                                    onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
+                                    style={{ width: '50px', padding: '5px' }}
+                                    placeholder="Qty"
+                                />
+                                <button onClick={() => saveEdit(item.id)} style={{ background: 'green', color: 'white', border: 'none', borderRadius: '4px' }}>Save</button>
+                                <button onClick={() => setEditingId(null)} style={{ background: '#666', color: 'white', border: 'none', borderRadius: '4px' }}>Cancel</button>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                    <div style={{ color: '#aaa' }}>Buy: ¥{item.purchasePrice.toLocaleString()}</div>
+                                    <div style={{ color: '#aaa', fontWeight: 'bold' }}>Qty: {item.quantity}</div>
+                                    {item.status === 'sold' && (
+                                        <div style={{ color: '#4caf50', fontWeight: 'bold' }}>
+                                            Sold: ¥{(item.soldPrice || 0).toLocaleString()}
+                                        </div>
+                                    )}
+                                </div>
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                    {item.status !== 'sold' && (
+                                        <>
+                                            <Edit2 size={20} color="#4a90e2" onClick={() => startEdit(item)} style={{ cursor: 'pointer' }} />
+                                            <button
+                                                onClick={() => handleSell(item)}
+                                                style={{
+                                                    background: 'var(--primary-color)',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '4px',
+                                                    padding: '5px 10px',
+                                                    fontSize: '0.8rem',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                Sell
+                                            </button>
+                                        </>
+                                    )}
+                                    <Trash2 size={20} color="#ff4444" onClick={() => handleDelete(item)} style={{ cursor: 'pointer' }} />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ))
+            )}
+        </div>
+    );
 };
