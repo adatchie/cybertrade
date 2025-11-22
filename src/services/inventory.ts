@@ -58,5 +58,14 @@ export const InventoryService = {
             soldDate: Date.now(),
             soldPrice: soldPrice || 0
         });
+    },
+
+    importItem: (item: InventoryItem) => {
+        const items = InventoryService.getAll();
+        // Check if ID exists to avoid duplicates
+        if (!items.find(i => i.id === item.id)) {
+            items.push(item);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+        }
     }
 };
