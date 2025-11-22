@@ -15,7 +15,6 @@ function App() {
   const [scannedCode, setScannedCode] = useState<string | null>(null);
   const [prices, setPrices] = useState<ShopPrice[]>([]);
   const [loadingPrices, setLoadingPrices] = useState(false);
-  const [purchasePrice, setPurchasePrice] = useState<string>('');
   const [purchasePrice, setPurchasePrice] = useState('');
   const [addQuantity, setAddQuantity] = useState('1');
   const [fetchedMeta, setFetchedMeta] = useState<{ name?: string, imageUrl?: string }>({});

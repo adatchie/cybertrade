@@ -9,9 +9,12 @@ export const InventoryService = {
         return data ? JSON.parse(data) : [];
     },
 
-    add: (item: Omit<InventoryItem, 'id' | 'timestamp' | 'status'>) => {
+    add: (item: Omit<InventoryItem, 'id' | 'timestamp'> & { status?: 'active' | 'sold' }) => {
         const items = InventoryService.getAll();
-        const existingItemIndex = items.findIndex(i => i.janCode === item.janCode && i.status === 'active');
+        // Only group if status is active (don't group sold items for now, or group them separately? Let's keep sold items separate entries for history)
+        const existingItemIndex = item.status !== 'sold'
+            ? items.findIndex(i => i.janCode === item.janCode && i.status === 'active')
+            : -1;
 
         if (existingItemIndex !== -1) {
             // Update existing item
@@ -19,7 +22,6 @@ export const InventoryService = {
             items[existingItemIndex] = {
                 ...existingItem,
                 quantity: existingItem.quantity + item.quantity,
-                // Update name/image if new one has it and old one doesn't (or just update to latest)
                 name: item.name || existingItem.name,
                 imageUrl: item.imageUrl || existingItem.imageUrl
             };
@@ -29,7 +31,7 @@ export const InventoryService = {
                 ...item,
                 id: crypto.randomUUID(),
                 timestamp: Date.now(),
-                status: 'active'
+                status: item.status || 'active'
             };
             items.push(newItem);
         }
