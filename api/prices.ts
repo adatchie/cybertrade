@@ -39,6 +39,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             url: `https://kaitori-homura.com/`,
             selector: '.price',
             fallback: true
+        },
+        {
+            name: 'Rakuten',
+            url: `https://search.rakuten.co.jp/search/mall/${jan}/`,
+            selector: '.searchresultitem',
+            fallback: true
         }
     ];
 
@@ -79,11 +85,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             // Scrape metadata if it's Kaitori Wiki (good source for names)
             if (shop.name === '買取Wiki') {
-                productName = $('meta[property="og:title"]').attr('content') || $('title').text() || '';
-                // Clean up title (remove site name etc if needed)
-                productName = productName.replace(' | 買取Wiki', '').replace('検索結果', '').trim();
+                // Try to find the first item in the list instead of page meta
+                // Kaitori Wiki often uses a table or list for results
+                const firstItemLink = $('.result_list a').first() || $('table a').first();
+                if (firstItemLink.length) {
+                    // If we found a link, maybe the text is the title
+                    const text = firstItemLink.text().trim();
+                    if (text && text.length > 5) productName = text;
+                }
+
+                if (!productName) {
+                    productName = $('meta[property="og:title"]').attr('content') || $('title').text() || '';
+                }
+
+                // Clean up title
+                productName = productName
+                    .replace(' | 買取Wiki', '')
+                    .replace('検索結果', '')
+                    .replace('高価買取', '')
+                    .trim();
+
+                // If title is still generic, discard it
+                if (productName.includes('買取Wiki') || productName === '') {
+                    productName = '';
+                }
 
                 imageUrl = $('meta[property="og:image"]').attr('content') || '';
+            }
+
+            // Rakuten Metadata Fetching (New Source)
+            if (shop.name === 'Rakuten') {
+                const firstItem = $('.searchresultitem').first();
+                if (firstItem.length) {
+                    productName = firstItem.find('.title a').text().trim();
+                    imageUrl = firstItem.find('.image img').attr('src') || '';
+                } else {
+                    // Fallback for Rakuten generic structure
+                    productName = $('div[class*="title"] a').first().text().trim();
+                    imageUrl = $('div[class*="image"] img').first().attr('src') || '';
+                }
             }
 
             const text = $('body').text();
@@ -108,7 +148,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 shopName: shop.name,
                 price,
                 url: shop.url,
-                productName, // Return these
+                productName,
                 imageUrl
             };
 
@@ -122,5 +162,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
     }));
 
-    res.status(200).json(results);
+    // Post-process: Pick the best metadata
+    let bestName = '';
+    let bestImage = '';
+
+    results.forEach(r => {
+        if (r.productName && r.productName.length > bestName.length) bestName = r.productName;
+        if (r.imageUrl && !bestImage) bestImage = r.imageUrl;
+    });
+
+    // Backfill metadata to all results if needed (optional, but good for UI)
+    const finalResults = results.map(r => ({
+        ...r,
+        productName: bestName || r.productName,
+        imageUrl: bestImage || r.imageUrl
+    }));
+
+    res.status(200).json(finalResults);
 }
