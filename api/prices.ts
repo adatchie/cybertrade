@@ -5,41 +5,24 @@ import * as cheerio from 'cheerio';
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { jan } = req.query;
 
-    if (!jan || typeof jan !== 'string') {
-        return res.status(400).json({ error: 'JAN code is required' });
-    }
-
-    const shops = [
-        {
-            name: '買取商店',
-            url: `https://www.kaitorishouten-co.jp/search/${jan}`,
-            selector: '.price_num', // Guessing common class names
-            fallback: true
-        },
-        {
-            name: '買取Wiki',
-            url: `https://gamekaitori.jp/search/result?keyword=${jan}`,
-            selector: '.price',
-            fallback: true
-        },
-        {
-            name: '買取ルデア',
+    {
+        name: '買取ルデア',
             url: `https://kaitori-rudeya.com/search/result?keyword=${jan}`,
-            selector: '.price',
-            fallback: true
-        },
-        {
-            name: '買取ソムリエ',
+                selector: '.price',
+                    fallback: true
+    },
+    {
+        name: '買取ソムリエ',
             url: `https://somurie-kaitori.com/search/result?keyword=${jan}`,
-            selector: '.price',
-            fallback: true
-        },
-        {
-            name: '買取ホムラ',
+                selector: '.price',
+                    fallback: true
+    },
+    {
+        name: '買取ホムラ',
             url: `https://kaitori-homura.com/search?q=${jan}`,
-            selector: '.price',
-            fallback: true
-        }
+                selector: '.price',
+                    fallback: true
+    }
     ];
 
     const results = await Promise.all(shops.map(async (shop) => {
