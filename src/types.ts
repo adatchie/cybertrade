@@ -5,6 +5,9 @@ export interface InventoryItem {
     purchasePrice: number;
     quantity: number;
     timestamp: number;
+    status: 'active' | 'sold';
+    soldDate?: number;
+    soldPrice?: number;
 }
 
 export interface ShopPrice {
