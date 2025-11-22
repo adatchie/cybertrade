@@ -9,38 +9,41 @@ const SHOPS = [
     { name: '買取ホムラ', urlGen: (jan: string) => `https://kaitori-homura.com/search?q=${jan}` },
 ];
 
-// Mock Data for demonstration (still kept for UI testing)
-const MOCK_DB: { [key: string]: ShopPrice[] } = {
-    '4902370542912': [
-        { shopName: '買取商店', price: 7500, url: 'https://www.kaitori-shoten.com/' },
-        { shopName: '買取Wiki', price: 7200, url: 'https://kaitori-wiki.com/' },
-    ]
-};
+
 
 export const PriceService = {
     fetchPrices: async (janCode: string): Promise<ShopPrice[]> => {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 500));
+        try {
+            // Call our own Vercel API
+            // Note: In local dev, this might fail if the API isn't running on the same port or proxy isn't set up.
+            // For Vercel deployment, /api/prices works.
+            // For local dev, we might need to point to the full URL or mock it if API isn't running locally.
 
-        // 1. Mock DB check
-        let results: ShopPrice[] = [];
-        if (MOCK_DB[janCode]) {
-            results = [...MOCK_DB[janCode]];
-        }
+            // Check if we are in dev mode and if API is available. 
+            // Since we are running 'vite', the API function won't run locally unless we use 'vercel dev'.
+            // So for local testing, we might still fallback to links, but for production, we use API.
 
-        // 2. Add "Search Link" entries for all shops (even if no price found)
-        // This allows the user to manually check
-        SHOPS.forEach(shop => {
-            if (!results.find(r => r.shopName === shop.name)) {
+            // For now, let's try to fetch. If it fails, fallback to links.
+            const response = await fetch(`/api/prices?jan=${janCode}`);
+            if (!response.ok) throw new Error('API failed');
+
+            const data = await response.json();
+            return data;
+
+        } catch (e) {
+            console.warn('API fetch failed, falling back to links generation', e);
+
+            // Fallback logic (same as before)
+            const results: ShopPrice[] = [];
+            SHOPS.forEach(shop => {
                 results.push({
                     shopName: shop.name,
-                    price: 0, // 0 indicates "Unknown/Check manually"
+                    price: 0,
                     url: shop.urlGen(janCode)
                 });
-            }
-        });
-
-        return results;
+            });
+            return results;
+        }
     },
 
     getBestPrice: (prices: ShopPrice[]) => {
