@@ -12,7 +12,6 @@ export const Scanner = ({ onScan }: ScannerProps) => {
     const [zoomCap, setZoomCap] = useState<{ min: number, max: number, step: number } | null>(null);
 
     useEffect(() => {
-        // Initialize scanner
         // Note: html5-qrcode renders into a div with a specific ID
         const scannerId = 'reader';
 
@@ -45,9 +44,8 @@ export const Scanner = ({ onScan }: ScannerProps) => {
                         // Success callback
                         onScan(decodedText);
                     },
-                    (errorMessage) => {
+                    (_) => {
                         // Error callback (frequent, ignore mostly)
-                        // console.log(errorMessage);
                     }
                 );
 
@@ -55,7 +53,7 @@ export const Scanner = ({ onScan }: ScannerProps) => {
                 setTimeout(() => {
                     const html5QrCode = (scannerRef.current as any)?.html5Qrcode;
                     if (html5QrCode) {
-                        const track = html5QrCode.getRunningTrackCameraCapabilities(); // This might not be exposed directly in Scanner wrapper
+                        // const track = html5QrCode.getRunningTrackCameraCapabilities(); // This might not be exposed directly in Scanner wrapper
                         // Alternative: Try to find the video element and get the stream
                         const video = document.querySelector(`#${scannerId} video`) as HTMLVideoElement;
                         if (video && video.srcObject) {

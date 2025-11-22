@@ -49,12 +49,7 @@ function App() {
     alert('Added to inventory!');
   };
 
-  const handleRemoveItem = (id: string) => {
-    if (confirm('Delete this item?')) {
-      InventoryService.remove(id);
-      setInventory(InventoryService.getAll());
-    }
-  };
+
 
   const bestPrice = PriceService.getBestPrice(prices);
 
