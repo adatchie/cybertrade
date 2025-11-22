@@ -18,25 +18,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
         {
             name: '買取Wiki',
-            url: `https://gamekaitori.jp/search/result?keyword=${jan}`,
+            url: `https://gamekaitori.jp/search?type=&q=${jan}`,
             selector: '.price',
             fallback: true
         },
         {
             name: '買取ルデア',
-            url: `https://kaitori-rudeya.com/search/result?keyword=${jan}`,
+            url: `https://kaitori-rudeya.com/search/index/${jan}/`,
             selector: '.price',
             fallback: true
         },
         {
             name: '買取ソムリエ',
-            url: `https://somurie-kaitori.com/search/result?keyword=${jan}`,
+            url: `https://somurie-kaitori.com/`,
             selector: '.price',
             fallback: true
         },
         {
             name: '買取ホムラ',
-            url: `https://kaitori-homura.com/search?q=${jan}`,
+            url: `https://kaitori-homura.com/`,
             selector: '.price',
             fallback: true
         }
@@ -44,8 +44,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const results = await Promise.all(shops.map(async (shop) => {
         try {
-            // Skip fetching for Kaitori Shoten as it's just a homepage link now
-            if (shop.name === '買取商店') {
+            // Skip fetching for shops that are just homepage links
+            if (['買取商店', '買取ソムリエ', '買取ホムラ'].includes(shop.name)) {
                 return {
                     shopName: shop.name,
                     price: 0,
