@@ -76,6 +76,25 @@ function App() {
               <Scanner onScan={handleScan} />
             ) : (
               <div className="card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                  <p style={{ margin: 0 }}>JAN: <strong>{scannedCode}</strong></p>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(scannedCode);
+                      alert('JAN code copied!');
+                    }}
+                    style={{
+                      padding: '4px 8px',
+                      fontSize: '0.8rem',
+                      background: '#eee',
+                      border: '1px solid #ccc',
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Copy
+                  </button>
+                </div>
                 <h2 className="text-neon">Scanned: {scannedCode}</h2>
 
                 {loadingPrices ? (
