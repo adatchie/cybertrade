@@ -123,8 +123,8 @@ export const InventoryList = ({ items, onUpdate }: InventoryListProps) => {
             for (const jan of uniqueJans) {
                 try {
                     const results = await PriceService.fetchPrices(jan);
-                    // Prioritize Rakuten for metadata
-                    const metaResult = results.find(r => r.shopName === 'Rakuten' && (r as any).productName);
+                    // Prioritize Yahoo or Rakuten for metadata
+                    const metaResult = results.find(r => (r.shopName === 'Yahoo' || r.shopName === 'Rakuten') && (r as any).productName);
 
                     if (metaResult) {
                         const name = (metaResult as any).productName;
