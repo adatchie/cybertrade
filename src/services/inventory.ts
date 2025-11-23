@@ -8,6 +8,10 @@ export const InventoryService = {
         return data ? JSON.parse(data) : [];
     },
 
+    setAll: (items: InventoryItem[]) => {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    },
+
     add: (item: Omit<InventoryItem, 'id' | 'timestamp' | 'status'> & { status?: 'active' | 'sold' }) => {
         const items = InventoryService.getAll();
         // Only group if status is active (don't group sold items for now)

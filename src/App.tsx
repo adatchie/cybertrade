@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Scan, List, TrendingUp } from 'lucide-react';
 import './index.css';
-import { Scanner } from './components/Scanner';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 import { InventoryList } from './components/InventoryList';
 import { InventoryService } from './services/inventory';
 import { PriceService } from './services/prices';
+import { SettingsModal } from './components/SettingsModal';
+import { GitHubConfig, GitHubService } from './services/github';
 import type { InventoryItem, ShopPrice } from './types';
+import { Settings, RefreshCw, Cloud } from 'lucide-react';
+import './App.css';
 
 function App() {
   const [activeTab, setActiveTab] = useState<'scan' | 'inventory' | 'analysis'>('scan');
@@ -19,9 +23,74 @@ function App() {
   const [addQuantity, setAddQuantity] = useState('1');
   const [fetchedMeta, setFetchedMeta] = useState<{ name?: string, imageUrl?: string }>({});
 
+  // GitHub Sync State
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [ghConfig, setGhConfig] = useState<GitHubConfig | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSha, setLastSha] = useState<string>('');
+
   useEffect(() => {
     setInventory(InventoryService.getAll());
+
+    // Load GitHub config
+    const savedConfig = localStorage.getItem('gh_config');
+    if (savedConfig) {
+      setGhConfig(JSON.parse(savedConfig));
+    }
   }, []);
+
+  const loadItems = () => {
+    setInventory(InventoryService.getAll());
+  };
+
+  const handleSync = async () => {
+    if (!ghConfig) {
+      setIsSettingsOpen(true);
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      // 1. Pull latest from GitHub
+      const result = await GitHubService.fetchInventory(ghConfig);
+
+      if (result) {
+        // Simple strategy: GitHub wins if exists, otherwise push local
+        // Ideally we merge, but user said "local data reload is fine"
+        if (result.items.length > 0) {
+          if (confirm(`Found ${result.items.length} items on GitHub. Overwrite local data?`)) {
+            InventoryService.setAll(result.items);
+            setInventory(result.items);
+            setLastSha(result.sha);
+            alert('Synced from GitHub!');
+          }
+        } else {
+          // File empty or new, push local
+          if (confirm('GitHub file is empty. Upload local data?')) {
+            const newSha = await GitHubService.saveInventory(ghConfig, inventory, result.sha);
+            setLastSha(newSha);
+            alert('Uploaded to GitHub!');
+          }
+        }
+      }
+    } catch (e) {
+      alert('Sync failed. Check console.');
+      console.error(e);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleSaveSettings = (config: GitHubConfig) => {
+    setGhConfig(config);
+    localStorage.setItem('gh_config', JSON.stringify(config));
+    setIsSettingsOpen(false);
+    // Auto sync after save?
+    if (confirm('Settings saved. Sync now?')) {
+      // Trigger sync in next tick
+      setTimeout(() => handleSync(), 100);
+    }
+  };
 
   const handleScan = async (code: string) => {
     setScannedCode(code);
@@ -66,6 +135,13 @@ function App() {
     setPurchasePrice('');
     setAddQuantity('1');
     alert(`Added ${qty} items to inventory!`);
+
+    // Auto-push to GitHub if configured
+    if (ghConfig) {
+      // We need the latest SHA to push. If we haven't synced yet, we might fail.
+      // For now, let's just notify user or try silent push if we have SHA
+      // Implementing a robust auto-sync is complex, let's stick to manual for now or simple push
+    }
   };
 
 
@@ -81,18 +157,49 @@ function App() {
         position: 'sticky',
         top: 0,
         zIndex: 10,
-        borderBottom: '1px solid var(--glass-border)'
+        borderBottom: '1px solid var(--glass-border)',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center'
       }}>
         <h1 style={{ fontSize: '1.2rem', margin: 0 }}>
           <span className="text-neon">CYBER</span> TRADER
         </h1>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={handleSync}
+            disabled={isSyncing}
+            style={{
+              background: '#333', color: '#fff', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '5px'
+            }}
+            title="Sync with GitHub"
+          >
+            <Cloud size={20} className={isSyncing ? 'spin' : ''} />
+            {ghConfig ? 'Sync' : 'Setup Sync'}
+          </button>
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            style={{ background: '#333', color: '#fff', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer' }}
+          >
+            <Settings size={20} />
+          </button>
+        </div>
       </header>
+
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onSave={handleSaveSettings}
+        currentConfig={ghConfig}
+      />
 
       <main className="container" style={{ paddingTop: '20px' }}>
         {activeTab === 'scan' && (
           <>
             {!scannedCode ? (
-              <Scanner onScan={handleScan} />
+              <div className="scanner-section">
+                <div id="reader" width="100%"></div>
+                <Scanner onScan={handleScan} />
+              </div>
             ) : (
               <div className="card">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
