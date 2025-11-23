@@ -1,6 +1,5 @@
-```javascript
 import { useState, useEffect } from 'react';
-import { Settings, Cloud } from 'lucide-react';
+import { Scan, List, TrendingUp, Settings, Cloud } from 'lucide-react';
 import './index.css';
 import { Scanner } from './components/Scanner';
 import { InventoryList } from './components/InventoryList';
@@ -14,7 +13,7 @@ import './App.css';
 
 function App() {
   const [activeTab, setActiveTab] = useState<'scan' | 'inventory' | 'analysis'>('scan');
-  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
 
   // Scan State
   const [scannedCode, setScannedCode] = useState<string | null>(null);
@@ -42,7 +41,7 @@ function App() {
   }, []);
 
   const loadItems = () => {
-    setItems(InventoryService.getAll());
+    setInventory(InventoryService.getAll());
   };
 
   const handleSync = async () => {
@@ -60,16 +59,16 @@ function App() {
         // Simple strategy: GitHub wins if exists, otherwise push local
         // Ideally we merge, but user said "local data reload is fine"
         if (result.items.length > 0) {
-          if (confirm(`Found ${ result.items.length } items on GitHub.Overwrite local data ? `)) {
+          if (confirm(`Found ${result.items.length} items on GitHub. Overwrite local data?`)) {
             InventoryService.setAll(result.items);
-            setItems(result.items);
+            setInventory(result.items);
             setLastSha(result.sha);
             alert('Synced from GitHub!');
           }
         } else {
           // File empty or new, push local
           if (confirm('GitHub file is empty. Upload local data?')) {
-            const newSha = await GitHubService.saveInventory(ghConfig, items, result.sha);
+            const newSha = await GitHubService.saveInventory(ghConfig, inventory, result.sha);
             setLastSha(newSha);
             alert('Uploaded to GitHub!');
           }
@@ -126,7 +125,7 @@ function App() {
 
     InventoryService.add({
       janCode: scannedCode,
-      name: fetchedMeta?.name || `Item ${ scannedCode } `,
+      name: fetchedMeta?.name || `Item ${scannedCode}`,
       imageUrl: fetchedMeta?.imageUrl,
       purchasePrice: price,
       quantity: addQuantity,
@@ -141,7 +140,7 @@ function App() {
     setPurchasePrice('');
     setAddQuantity(1);
     setFetchedMeta(null);
-    alert(`Added ${ addQuantity } items to inventory!`);
+    alert(`Added ${addQuantity} items to inventory!`);
 
     // Auto-push to GitHub if configured
     if (ghConfig) {
@@ -150,8 +149,6 @@ function App() {
       // Implementing a robust auto-sync is complex, let's stick to manual for now or simple push
     }
   };
-
-
 
   const bestPrice = PriceService.getBestPrice(prices);
 
