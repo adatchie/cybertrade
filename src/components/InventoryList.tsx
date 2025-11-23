@@ -115,11 +115,9 @@ export const InventoryList = ({ items, onUpdate }: InventoryListProps) => {
             // But mainly we just want to force refresh everything that looks suspicious or user requested
 
             items.forEach(item => {
-                // Reset if it looks like garbage OR if it contains replacement characters like  (though rare in JSON)
-                // Or simply reset everything if user wants a full refresh? 
-                // Let's stick to garbage + generic "Item ..." for now, but maybe user wants to force fix everything.
-                // Let's assume everything needs a check.
-                if (garbage.some(g => item.name.toLowerCase().includes(g.toLowerCase())) || item.name.includes('')) {
+                // Reset if it looks like garbage (e.g. site titles)
+                // Fix: Removed accidental always-true check that caused valid names to be reset
+                if (garbage.some(g => item.name.toLowerCase().includes(g.toLowerCase()))) {
                     InventoryService.update(item.id, {
                         name: `Item ${item.janCode}`, // Reset to generic
                     });
