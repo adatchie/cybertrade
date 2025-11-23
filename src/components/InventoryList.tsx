@@ -1,4 +1,4 @@
-import type { InventoryItem } from '../types';
+import { InventoryItem } from '../types';
 import { Trash2, Edit2, RefreshCw, Download, Upload } from 'lucide-react';
 import { useState } from 'react';
 import { InventoryService } from '../services/inventory';
@@ -99,7 +99,7 @@ export const InventoryList = ({ items, onUpdate }: InventoryListProps) => {
     };
 
     const handleRefreshMetadata = async () => {
-        if (!confirm('Update product info? This will also clean up "Kaitori Wiki" titles.')) return;
+        if (!confirm('Update product info? This will try to fix broken titles.')) return;
 
         setIsRefreshing(true);
         let updatedCount = 0;
@@ -110,8 +110,16 @@ export const InventoryList = ({ items, onUpdate }: InventoryListProps) => {
 
             // First, aggressively clean known garbage titles locally
             const garbage = ['買取Wiki', '買取wiki', 'ゲーム機の買取専門店', '検索結果'];
+
+            // Also detect mojibake or broken encoding if possible (e.g. very short weird names)
+            // But mainly we just want to force refresh everything that looks suspicious or user requested
+
             items.forEach(item => {
-                if (garbage.some(g => item.name.toLowerCase().includes(g.toLowerCase()))) {
+                // Reset if it looks like garbage OR if it contains replacement characters like  (though rare in JSON)
+                // Or simply reset everything if user wants a full refresh? 
+                // Let's stick to garbage + generic "Item ..." for now, but maybe user wants to force fix everything.
+                // Let's assume everything needs a check.
+                if (garbage.some(g => item.name.toLowerCase().includes(g.toLowerCase())) || item.name.includes('')) {
                     InventoryService.update(item.id, {
                         name: `Item ${item.janCode}`, // Reset to generic
                     });
@@ -123,7 +131,7 @@ export const InventoryList = ({ items, onUpdate }: InventoryListProps) => {
             for (const jan of uniqueJans) {
                 try {
                     const results = await PriceService.fetchPrices(jan);
-                    // Prioritize Yahoo or Rakuten for metadata
+                    // Prioritize Rakuten or Yahoo for metadata
                     const metaResult = results.find(r => (r.shopName === 'Yahoo' || r.shopName === 'Rakuten') && (r as any).productName);
 
                     if (metaResult) {
@@ -132,8 +140,9 @@ export const InventoryList = ({ items, onUpdate }: InventoryListProps) => {
 
                         const itemsToUpdate = items.filter(i => i.janCode === jan);
                         itemsToUpdate.forEach(item => {
-                            // Update if name is generic or still contains garbage (double check)
-                            if (item.name.startsWith('Item ') || garbage.some(g => item.name.toLowerCase().includes(g.toLowerCase()))) {
+                            // Update if name is generic, garbage, or just force update to fix mojibake
+                            // We'll update if the new name is different and looks valid
+                            if (name && name !== item.name) {
                                 InventoryService.update(item.id, {
                                     name: name,
                                     imageUrl: imageUrl
@@ -148,7 +157,7 @@ export const InventoryList = ({ items, onUpdate }: InventoryListProps) => {
                 }
             }
             onUpdate();
-            alert(`Metadata updated!\nUpdated/Cleaned: ${updatedCount} items\nErrors: ${errorCount}`);
+            alert(`Metadata updated!\nUpdated/Fixed: ${updatedCount} items\nErrors: ${errorCount}`);
         } catch (error) {
             console.error(error);
             alert('Error updating metadata');
@@ -257,7 +266,7 @@ export const InventoryList = ({ items, onUpdate }: InventoryListProps) => {
                             borderRadius: '8px',
                             cursor: isRefreshing ? 'wait' : 'pointer'
                         }}
-                        title="Refresh Metadata"
+                        title="Force Refresh Metadata (Fix Broken Titles)"
                     >
                         <RefreshCw size={20} className={isRefreshing ? 'spin' : ''} />
                     </button>
