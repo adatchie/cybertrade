@@ -143,7 +143,8 @@ export const InventoryList = ({ items, onUpdate }: InventoryListProps) => {
                         itemsToUpdate.forEach(item => {
                             // Update if name is generic, garbage, or just force update to fix mojibake
                             // We'll update if the new name is different and looks valid
-                            if (name && name !== item.name) {
+                            // Update if we found a valid name
+                            if (name) {
                                 InventoryService.update(item.id, {
                                     name: name,
                                     imageUrl: imageUrl
