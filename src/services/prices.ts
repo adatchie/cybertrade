@@ -2,7 +2,24 @@ import type { ShopPrice } from '../types';
 
 export const PriceService = {
     fetchPrices: async (janCode: string): Promise<ShopPrice[]> => {
-        const shops = [
+        // Shops for Price Checking (Links only)
+        const linkShops = [
+            {
+                name: 'Kaitori Wiki',
+                url: `https://kaitori.wiki/search/${janCode}`,
+            },
+            {
+                name: 'Kaitori Shoten',
+                url: `https://www.kaitorishouten.co.jp/search?q=${janCode}`,
+            },
+            {
+                name: 'Kaitori Rudeya',
+                url: `https://kaitori-rudeya.com/search?q=${janCode}`,
+            }
+        ];
+
+        // Shops for Metadata (Scraping)
+        const metaShops = [
             {
                 name: 'Rakuten',
                 url: `https://search.rakuten.co.jp/search/mall/${janCode}/`,
@@ -14,6 +31,17 @@ export const PriceService = {
         ];
 
         const results: ShopPrice[] = [];
+
+        // 1. Add Link Shops (Price 0/Unknown)
+        linkShops.forEach(shop => {
+            results.push({
+                shopName: shop.name,
+                price: 0,
+                url: shop.url,
+                productName: '',
+                imageUrl: ''
+            });
+        });
 
         // Helper to fetch via CORS proxy
         const fetchWithProxy = async (targetUrl: string) => {
@@ -28,9 +56,9 @@ export const PriceService = {
             }
         };
 
-        await Promise.all(shops.map(async (shop) => {
+        // 2. Fetch Metadata from Rakuten/Yahoo
+        await Promise.all(metaShops.map(async (shop) => {
             const html = await fetchWithProxy(shop.url);
-            let price = 0;
             let productName = '';
             let imageUrl = '';
 
@@ -63,14 +91,36 @@ export const PriceService = {
                 }
             }
 
-            results.push({
-                shopName: shop.name,
-                price,
-                url: shop.url,
-                productName,
-                imageUrl
-            } as any);
+            if (productName) {
+                results.push({
+                    shopName: shop.name,
+                    price: 0,
+                    url: shop.url,
+                    productName,
+                    imageUrl
+                });
+            }
         }));
+
+        // 3. Fallback: Google Books API (Great for books/media)
+        try {
+            const googleRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${janCode}`);
+            if (googleRes.ok) {
+                const data = await googleRes.json();
+                if (data.items && data.items.length > 0) {
+                    const info = data.items[0].volumeInfo;
+                    results.push({
+                        shopName: 'GoogleBooks',
+                        price: 0,
+                        url: info.infoLink,
+                        productName: info.title,
+                        imageUrl: info.imageLinks?.thumbnail || ''
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn('Google Books fetch failed', e);
+        }
 
         return results;
     },

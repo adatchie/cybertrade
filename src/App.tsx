@@ -105,8 +105,12 @@ function App() {
       const results = await PriceService.fetchPrices(decodedText);
       setPrices(results);
 
-      // Try to find name/image from results (e.g. from Kaitori Wiki)
-      const meta = results.find(r => (r.shopName === 'Rakuten' || r.shopName === 'Yahoo') && (r as any).productName);
+      // Try to find name/image from results (Rakuten > Yahoo > GoogleBooks)
+      const meta = results.find(r =>
+        (r.shopName === 'Rakuten' || r.shopName === 'Yahoo' || r.shopName === 'GoogleBooks') &&
+        (r as any).productName
+      );
+
       if (meta) {
         setFetchedMeta({
           name: (meta as any).productName,
@@ -160,6 +164,9 @@ function App() {
   };
 
   const bestPrice = PriceService.getBestPrice(prices);
+
+  // Filter out metadata-only sources from the link list
+  const displayPrices = prices.filter(p => !['Rakuten', 'Yahoo', 'GoogleBooks'].includes(p.shopName));
 
   return (
     <div className="app-container">
@@ -295,7 +302,7 @@ function App() {
                     )}
 
                     <div style={{ display: 'grid', gap: '10px', marginBottom: '20px' }}>
-                      {prices.map((shop) => (
+                      {displayPrices.map((shop) => (
                         <a
                           key={shop.shopName}
                           href={shop.url}
