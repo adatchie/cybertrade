@@ -1,4 +1,4 @@
-import { InventoryItem } from '../types';
+import type { InventoryItem } from '../types';
 import { Trash2, Edit2, RefreshCw, Download, Upload } from 'lucide-react';
 import { useState } from 'react';
 import { InventoryService } from '../services/inventory';
