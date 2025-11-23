@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Cloud } from 'lucide-react';
+import { Scan, List, TrendingUp, Settings, Cloud } from 'lucide-react';
 import './index.css';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { InventoryList } from './components/InventoryList';
@@ -13,7 +13,7 @@ import './App.css';
 
 function App() {
   const [activeTab, setActiveTab] = useState<'scan' | 'inventory' | 'analysis'>('scan');
-  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
 
   // Scan State
   const [scannedCode, setScannedCode] = useState<string | null>(null);
@@ -41,7 +41,7 @@ function App() {
   }, []);
 
   const loadItems = () => {
-    setItems(InventoryService.getAll());
+    setInventory(InventoryService.getAll());
   };
 
   const handleSync = async () => {
@@ -61,14 +61,14 @@ function App() {
         if (result.items.length > 0) {
           if (confirm(`Found ${result.items.length} items on GitHub. Overwrite local data?`)) {
             InventoryService.setAll(result.items);
-            setItems(result.items);
+            setInventory(result.items);
             setLastSha(result.sha);
             alert('Synced from GitHub!');
           }
         } else {
           // File empty or new, push local
           if (confirm('GitHub file is empty. Upload local data?')) {
-            const newSha = await GitHubService.saveInventory(ghConfig, items, result.sha);
+            const newSha = await GitHubService.saveInventory(ghConfig, inventory, result.sha);
             setLastSha(newSha);
             alert('Uploaded to GitHub!');
           }
@@ -301,7 +301,7 @@ function App() {
                       <div className="add-stock-form" style={{ marginTop: '20px', padding: '15px', background: '#222', borderRadius: '8px' }}>
                         <h3 style={{ marginTop: 0 }}>Add to Stock</h3>
 
-                        {fetchedMeta.name && (
+                        {fetchedMeta && fetchedMeta.name && (
                           <div style={{ marginBottom: '10px', display: 'flex', gap: '10px', alignItems: 'center' }}>
                             {fetchedMeta.imageUrl && <img src={fetchedMeta.imageUrl} alt="Product" style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '4px' }} />}
                             <p style={{ margin: 0, fontSize: '0.9rem' }}>{fetchedMeta.name}</p>
@@ -325,7 +325,7 @@ function App() {
                               type="number"
                               placeholder="1"
                               value={addQuantity}
-                              onChange={(e) => setAddQuantity(e.target.value)}
+                              onChange={(e) => setAddQuantity(parseInt(e.target.value) || 1)}
                               style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #444', background: '#333', color: '#fff' }}
                             />
                           </div>
