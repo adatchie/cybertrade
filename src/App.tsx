@@ -126,7 +126,7 @@ function App() {
       /* verbose= */ false
     );
 
-    scanner.render(handleScan, (error) => {
+    scanner.render(handleScan, (_) => {
       // console.warn(error);
     });
 
