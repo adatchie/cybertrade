@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { InventoryItem } from '../types';
+import type { InventoryItem } from '../types';
 
 const GITHUB_API_BASE = 'https://api.github.com';
 

@@ -1,36 +1,37 @@
 import { useState, useEffect } from 'react';
-import { Scan, List, TrendingUp } from 'lucide-react';
+import { Settings, Cloud } from 'lucide-react';
 import './index.css';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { InventoryList } from './components/InventoryList';
 import { InventoryService } from './services/inventory';
 import { PriceService } from './services/prices';
 import { SettingsModal } from './components/SettingsModal';
-import { GitHubConfig, GitHubService } from './services/github';
+import { GitHubService } from './services/github';
+import type { GitHubConfig } from './services/github';
 import type { InventoryItem, ShopPrice } from './types';
-import { Settings, RefreshCw, Cloud } from 'lucide-react';
 import './App.css';
 
 function App() {
   const [activeTab, setActiveTab] = useState<'scan' | 'inventory' | 'analysis'>('scan');
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [items, setItems] = useState<InventoryItem[]>([]);
 
   // Scan State
   const [scannedCode, setScannedCode] = useState<string | null>(null);
   const [prices, setPrices] = useState<ShopPrice[]>([]);
   const [loadingPrices, setLoadingPrices] = useState(false);
-  const [purchasePrice, setPurchasePrice] = useState('');
-  const [addQuantity, setAddQuantity] = useState('1');
-  const [fetchedMeta, setFetchedMeta] = useState<{ name?: string, imageUrl?: string }>({});
+  const [purchasePrice, setPurchasePrice] = useState<string>('');
+  const [addQuantity, setAddQuantity] = useState<number>(1);
+  const [fetchedMeta, setFetchedMeta] = useState<{ name: string, imageUrl: string } | null>(null);
 
   // GitHub Sync State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [ghConfig, setGhConfig] = useState<GitHubConfig | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [lastSha, setLastSha] = useState<string>('');
 
   useEffect(() => {
-    setInventory(InventoryService.getAll());
+    loadItems();
 
     // Load GitHub config
     const savedConfig = localStorage.getItem('gh_config');
@@ -40,7 +41,7 @@ function App() {
   }, []);
 
   const loadItems = () => {
-    setInventory(InventoryService.getAll());
+    setItems(InventoryService.getAll());
   };
 
   const handleSync = async () => {
@@ -60,14 +61,14 @@ function App() {
         if (result.items.length > 0) {
           if (confirm(`Found ${result.items.length} items on GitHub. Overwrite local data?`)) {
             InventoryService.setAll(result.items);
-            setInventory(result.items);
+            setItems(result.items);
             setLastSha(result.sha);
             alert('Synced from GitHub!');
           }
         } else {
           // File empty or new, push local
           if (confirm('GitHub file is empty. Upload local data?')) {
-            const newSha = await GitHubService.saveInventory(ghConfig, inventory, result.sha);
+            const newSha = await GitHubService.saveInventory(ghConfig, items, result.sha);
             setLastSha(newSha);
             alert('Uploaded to GitHub!');
           }
@@ -92,20 +93,23 @@ function App() {
     }
   };
 
-  const handleScan = async (code: string) => {
-    setScannedCode(code);
+  const handleScan = async (decodedText: string) => {
+    // Avoid duplicate scans
+    if (scannedCode === decodedText) return;
+
+    setScannedCode(decodedText);
     setLoadingPrices(true);
-    setFetchedMeta({}); // Reset meta
+    setFetchedMeta(null); // Reset meta
     try {
-      const results = await PriceService.fetchPrices(code);
+      const results = await PriceService.fetchPrices(decodedText);
       setPrices(results);
 
       // Try to find name/image from results (e.g. from Kaitori Wiki)
-      const wikiResult = results.find(r => r.shopName === '買取Wiki' && (r as any).productName);
-      if (wikiResult) {
+      const meta = results.find(r => (r.shopName === 'Rakuten' || r.shopName === 'Yahoo') && (r as any).productName);
+      if (meta) {
         setFetchedMeta({
-          name: (wikiResult as any).productName,
-          imageUrl: (wikiResult as any).imageUrl
+          name: (meta as any).productName,
+          imageUrl: (meta as any).imageUrl
         });
       }
     } catch (error) {
@@ -115,26 +119,46 @@ function App() {
     }
   };
 
+  useEffect(() => {
+    const scanner = new Html5QrcodeScanner(
+      "reader",
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      /* verbose= */ false
+    );
+
+    scanner.render(handleScan, (error) => {
+      // console.warn(error);
+    });
+
+    return () => {
+      scanner.clear().catch(error => {
+        console.error("Failed to clear html5-qrcode scanner. ", error);
+      });
+    };
+  }, []);
+
   const handleAddToInventory = () => {
     if (!scannedCode) return;
     const price = parseInt(purchasePrice) || 0;
-    const qty = parseInt(addQuantity) || 1;
 
     InventoryService.add({
       janCode: scannedCode,
-      name: fetchedMeta.name || `Item ${scannedCode}`,
-      imageUrl: fetchedMeta.imageUrl,
+      name: fetchedMeta?.name || `Item ${scannedCode}`,
+      imageUrl: fetchedMeta?.imageUrl,
       purchasePrice: price,
-      quantity: qty
+      quantity: addQuantity,
+      status: 'active'
     });
-    setInventory(InventoryService.getAll());
+
+    loadItems();
 
     // Reset
     setScannedCode(null);
     setPrices([]);
     setPurchasePrice('');
-    setAddQuantity('1');
-    alert(`Added ${qty} items to inventory!`);
+    setAddQuantity(1);
+    setFetchedMeta(null);
+    alert(`Added ${addQuantity} items to inventory!`);
 
     // Auto-push to GitHub if configured
     if (ghConfig) {
@@ -197,8 +221,7 @@ function App() {
           <>
             {!scannedCode ? (
               <div className="scanner-section">
-                <div id="reader" width="100%"></div>
-                <Scanner onScan={handleScan} />
+                <div id="reader" style={{ width: '100%' }}></div>
               </div>
             ) : (
               <div className="card">

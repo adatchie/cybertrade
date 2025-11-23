@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { GitHubConfig, GitHubService } from '../services/github';
+import { GitHubService } from '../services/github';
+import type { GitHubConfig } from '../services/github';
 import { Save, Github, AlertCircle } from 'lucide-react';
 
 interface SettingsModalProps {
