@@ -37,7 +37,10 @@ export const GitHubService = {
                 },
             });
 
-            const content = atob(response.data.content); // Decode Base64
+            // Fix: Correctly decode UTF-8 string from Base64
+            // The content was saved with btoa(unescape(encodeURIComponent(...)))
+            // So we must reverse it with decodeURIComponent(escape(atob(...)))
+            const content = decodeURIComponent(escape(atob(response.data.content)));
             const items = JSON.parse(content);
             return { items, sha: response.data.sha };
         } catch (e: any) {
