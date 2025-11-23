@@ -1,7 +1,8 @@
+```javascript
 import { useState, useEffect } from 'react';
-import { Scan, List, TrendingUp, Settings, Cloud } from 'lucide-react';
+import { Settings, Cloud } from 'lucide-react';
 import './index.css';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { Scanner } from './components/Scanner';
 import { InventoryList } from './components/InventoryList';
 import { InventoryService } from './services/inventory';
 import { PriceService } from './services/prices';
@@ -13,7 +14,7 @@ import './App.css';
 
 function App() {
   const [activeTab, setActiveTab] = useState<'scan' | 'inventory' | 'analysis'>('scan');
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [items, setItems] = useState<InventoryItem[]>([]);
 
   // Scan State
   const [scannedCode, setScannedCode] = useState<string | null>(null);
@@ -41,7 +42,7 @@ function App() {
   }, []);
 
   const loadItems = () => {
-    setInventory(InventoryService.getAll());
+    setItems(InventoryService.getAll());
   };
 
   const handleSync = async () => {
@@ -59,16 +60,16 @@ function App() {
         // Simple strategy: GitHub wins if exists, otherwise push local
         // Ideally we merge, but user said "local data reload is fine"
         if (result.items.length > 0) {
-          if (confirm(`Found ${result.items.length} items on GitHub. Overwrite local data?`)) {
+          if (confirm(`Found ${ result.items.length } items on GitHub.Overwrite local data ? `)) {
             InventoryService.setAll(result.items);
-            setInventory(result.items);
+            setItems(result.items);
             setLastSha(result.sha);
             alert('Synced from GitHub!');
           }
         } else {
           // File empty or new, push local
           if (confirm('GitHub file is empty. Upload local data?')) {
-            const newSha = await GitHubService.saveInventory(ghConfig, inventory, result.sha);
+            const newSha = await GitHubService.saveInventory(ghConfig, items, result.sha);
             setLastSha(newSha);
             alert('Uploaded to GitHub!');
           }
@@ -119,31 +120,13 @@ function App() {
     }
   };
 
-  useEffect(() => {
-    const scanner = new Html5QrcodeScanner(
-      "reader",
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      /* verbose= */ false
-    );
-
-    scanner.render(handleScan, (_) => {
-      // console.warn(error);
-    });
-
-    return () => {
-      scanner.clear().catch(error => {
-        console.error("Failed to clear html5-qrcode scanner. ", error);
-      });
-    };
-  }, []);
-
   const handleAddToInventory = () => {
     if (!scannedCode) return;
     const price = parseInt(purchasePrice) || 0;
 
     InventoryService.add({
       janCode: scannedCode,
-      name: fetchedMeta?.name || `Item ${scannedCode}`,
+      name: fetchedMeta?.name || `Item ${ scannedCode } `,
       imageUrl: fetchedMeta?.imageUrl,
       purchasePrice: price,
       quantity: addQuantity,
@@ -158,7 +141,7 @@ function App() {
     setPurchasePrice('');
     setAddQuantity(1);
     setFetchedMeta(null);
-    alert(`Added ${addQuantity} items to inventory!`);
+    alert(`Added ${ addQuantity } items to inventory!`);
 
     // Auto-push to GitHub if configured
     if (ghConfig) {
@@ -221,7 +204,7 @@ function App() {
           <>
             {!scannedCode ? (
               <div className="scanner-section">
-                <div id="reader" style={{ width: '100%' }}></div>
+                <Scanner onScan={handleScan} />
               </div>
             ) : (
               <div className="card">
