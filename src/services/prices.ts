@@ -43,17 +43,22 @@ export const PriceService = {
             });
         });
 
-        // Helper to fetch via CORS proxy
+        // Helper to fetch via CORS proxy with fallback
         const fetchWithProxy = async (targetUrl: string) => {
-            try {
-                // Using allorigins.win as a CORS proxy
-                const response = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`);
-                if (!response.ok) return null;
-                return await response.text();
-            } catch (e) {
-                console.warn(`Proxy fetch failed for ${targetUrl}`, e);
-                return null;
+            const proxies = [
+                (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+                (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+            ];
+
+            for (const createProxyUrl of proxies) {
+                try {
+                    const response = await fetch(createProxyUrl(targetUrl));
+                    if (response.ok) return await response.text();
+                } catch (e) {
+                    console.warn(`Proxy fetch failed`, e);
+                }
             }
+            return null;
         };
 
         // 2. Fetch Metadata from Rakuten/Yahoo
@@ -68,23 +73,37 @@ export const PriceService = {
 
                 // Rakuten Parsing
                 if (shop.name === 'Rakuten') {
-                    const titleEl = doc.querySelector('.searchresultitem .title a') || doc.querySelector('div[class*="title"] a');
+                    // Try multiple selectors for title
+                    const titleEl = doc.querySelector('.searchresultitem .title a')
+                        || doc.querySelector('div[class*="title"] a')
+                        || doc.querySelector('h2 a')
+                        || doc.querySelector('.dui-card.searchresultitem .title a');
+
                     if (titleEl) productName = titleEl.textContent?.trim() || '';
 
-                    const imgEl = doc.querySelector('.searchresultitem .image img') || doc.querySelector('div[class*="image"] img');
+                    // Try multiple selectors for image
+                    const imgEl = doc.querySelector('.searchresultitem .image img')
+                        || doc.querySelector('div[class*="image"] img')
+                        || doc.querySelector('.dui-card.searchresultitem img');
+
                     if (imgEl) {
                         imageUrl = imgEl.getAttribute('src') || imgEl.getAttribute('data-src') || '';
                         const alt = imgEl.getAttribute('alt');
-                        if (alt && alt.length > productName.length) productName = alt;
+                        if (alt && (!productName || alt.length > productName.length)) productName = alt;
                     }
                 }
 
                 // Yahoo Parsing
                 if (shop.name === 'Yahoo') {
-                    const titleEl = doc.querySelector('a.LoopList__itemTitle');
+                    const titleEl = doc.querySelector('a.LoopList__itemTitle')
+                        || doc.querySelector('.LoopList__itemTitle a')
+                        || doc.querySelector('[class*="LoopList__itemTitle"]');
+
                     if (titleEl) productName = titleEl.textContent?.trim() || '';
 
-                    const imgEl = doc.querySelector('li.LoopList__item img');
+                    const imgEl = doc.querySelector('li.LoopList__item img')
+                        || doc.querySelector('[class*="LoopList__item"] img');
+
                     if (imgEl) {
                         imageUrl = imgEl.getAttribute('src') || imgEl.getAttribute('data-src') || '';
                     }
