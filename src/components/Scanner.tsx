@@ -10,81 +10,98 @@ export const Scanner = ({ onScan }: ScannerProps) => {
     const [error, setError] = useState<string>('');
     const [zoom, setZoom] = useState(1);
     const [zoomCap, setZoomCap] = useState<{ min: number, max: number, step: number } | null>(null);
+    const initAttemptRef = useRef(0);
 
     useEffect(() => {
-        // Note: html5-qrcode renders into a div with a specific ID
         const scannerId = 'reader';
 
-        // Wait for element to be available
-        const element = document.getElementById(scannerId);
-        if (!element) return;
-
-        if (!scannerRef.current) {
-            try {
-                scannerRef.current = new Html5QrcodeScanner(
-                    scannerId,
-                    {
-                        fps: 10,
-                        qrbox: { width: 250, height: 250 }, // Square to support vertical codes
-                        aspectRatio: 1.0,
-                        showTorchButtonIfSupported: true,
-                        useBarCodeDetectorIfSupported: true, // Use native API (Chrome Android) for better performance/orientation
-                        videoConstraints: {
-                            facingMode: "environment",
-                            width: { min: 640, ideal: 1280, max: 1920 }, // Higher res for better details
-                            height: { min: 480, ideal: 720, max: 1080 },
-                            advanced: [{ focusMode: "continuous" } as any] // Try to force continuous focus
-                        }
-                    },
-                    /* verbose= */ false
-                );
-
-                scannerRef.current.render(
-                    (decodedText) => {
-                        // Success callback
-                        onScan(decodedText);
-                    },
-                    (_) => {
-                        // Error callback (frequent, ignore mostly)
-                    }
-                );
-
-                // Hook into the camera feed to get zoom capabilities after a short delay
-                setTimeout(() => {
-                    const html5QrCode = (scannerRef.current as any)?.html5Qrcode;
-                    if (html5QrCode) {
-                        // const track = html5QrCode.getRunningTrackCameraCapabilities(); // This might not be exposed directly in Scanner wrapper
-                        // Alternative: Try to find the video element and get the stream
-                        const video = document.querySelector(`#${scannerId} video`) as HTMLVideoElement;
-                        if (video && video.srcObject) {
-                            const stream = video.srcObject as MediaStream;
-                            const track = stream.getVideoTracks()[0];
-                            const capabilities = track.getCapabilities() as any;
-                            if (capabilities.zoom) {
-                                setZoomCap({
-                                    min: capabilities.zoom.min,
-                                    max: capabilities.zoom.max,
-                                    step: capabilities.zoom.step
-                                });
-                                const settings = track.getSettings() as any;
-                                if (settings.zoom) setZoom(settings.zoom);
-                            }
-                        }
-                    }
-                }, 2000);
-
-            } catch (e) {
-                setError('Failed to initialize camera. Please ensure permission is granted.');
-                console.error(e);
-            }
+        // Cleanup previous instance if exists
+        if (scannerRef.current) {
+            scannerRef.current.clear().catch(console.error);
         }
 
-        return () => {
-            if (scannerRef.current) {
-                scannerRef.current.clear().catch(console.error);
-                scannerRef.current = null;
-            }
-        };
+        try {
+            scannerRef.current = new Html5QrcodeScanner(
+                scannerId,
+                {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 },
+                    aspectRatio: 1.0,
+                    showTorchButtonIfSupported: true,
+                    useBarCodeDetectorIfSupported: true,
+                    videoConstraints: {
+                        facingMode: "environment",
+                        width: { min: 640, ideal: 1280, max: 1920 },
+                        height: { min: 480, ideal: 720, max: 1080 },
+                        advanced: [{ focusMode: "continuous" } as any]
+                    }
+                },
+                /* verbose= */ false
+            );
+
+            scannerRef.current.render(
+                (decodedText) => {
+                    onScan(decodedText);
+                },
+                (_) => {
+                    // Ignore errors
+                }
+            );
+
+            // Polling to detect camera and set zoom
+            const checkCamera = setInterval(() => {
+                initAttemptRef.current++;
+                const video = document.querySelector(`#${scannerId} video`) as HTMLVideoElement;
+
+                if (video && video.srcObject) {
+                    const stream = video.srcObject as MediaStream;
+                    const track = stream.getVideoTracks()[0];
+
+                    if (track) {
+                        const capabilities = track.getCapabilities() as any;
+
+                        // Check if zoom is supported
+                        if (capabilities.zoom) {
+                            clearInterval(checkCamera); // Stop polling
+
+                            const min = capabilities.zoom.min;
+                            const max = capabilities.zoom.max;
+                            const step = capabilities.zoom.step;
+
+                            setZoomCap({ min, max, step });
+
+                            // Set default zoom to ~2.0x or 20% of range, whichever is safer
+                            // Barcodes are hard to read at 1x on wide lenses
+                            let defaultZoom = 2.0;
+                            if (defaultZoom < min) defaultZoom = min;
+                            if (defaultZoom > max) defaultZoom = min + (max - min) * 0.2; // Fallback to 20%
+
+                            // Apply default zoom
+                            track.applyConstraints({
+                                advanced: [{ zoom: defaultZoom } as any]
+                            }).then(() => {
+                                setZoom(defaultZoom);
+                                console.log(`Zoom set to ${defaultZoom}`);
+                            }).catch(e => console.warn('Failed to set default zoom', e));
+                        } else if (initAttemptRef.current > 20) {
+                            // Stop checking after ~10 seconds (20 * 500ms) if no zoom found
+                            clearInterval(checkCamera);
+                        }
+                    }
+                }
+            }, 500);
+
+            return () => {
+                clearInterval(checkCamera);
+                if (scannerRef.current) {
+                    scannerRef.current.clear().catch(console.error);
+                }
+            };
+
+        } catch (e) {
+            setError('Failed to initialize camera.');
+            console.error(e);
+        }
     }, [onScan]);
 
     const handleZoomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -117,14 +134,15 @@ export const Scanner = ({ onScan }: ScannerProps) => {
                         left: '20px',
                         right: '20px',
                         zIndex: 100,
-                        background: 'rgba(0,0,0,0.5)',
-                        padding: '10px',
-                        borderRadius: '20px',
+                        background: 'rgba(0,0,0,0.6)',
+                        padding: '10px 15px',
+                        borderRadius: '30px',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '10px'
+                        gap: '15px',
+                        backdropFilter: 'blur(4px)'
                     }}>
-                        <span style={{ fontSize: '0.8rem' }}>1x</span>
+                        <span style={{ fontSize: '0.8rem', color: 'white', fontWeight: 'bold' }}>{zoomCap.min}x</span>
                         <input
                             type="range"
                             min={zoomCap.min}
@@ -132,15 +150,15 @@ export const Scanner = ({ onScan }: ScannerProps) => {
                             step={zoomCap.step}
                             value={zoom}
                             onChange={handleZoomChange}
-                            style={{ flex: 1 }}
+                            style={{ flex: 1, cursor: 'pointer' }}
                         />
-                        <span style={{ fontSize: '0.8rem' }}>{zoomCap.max}x</span>
+                        <span style={{ fontSize: '0.8rem', color: 'white', fontWeight: 'bold' }}>{zoomCap.max}x</span>
                     </div>
                 )}
             </div>
 
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '10px' }}>
-                Point camera at a JAN/EAN code. Use zoom if focus is difficult.
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '10px', textAlign: 'center' }}>
+                Point camera at a JAN/EAN code.
             </p>
         </div>
     );
