@@ -28,7 +28,7 @@ function App() {
   const [ghConfig, setGhConfig] = useState<GitHubConfig | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [lastSha, setLastSha] = useState<string>('');
+  const [, setLastSha] = useState<string>('');
 
   useEffect(() => {
     loadItems();
